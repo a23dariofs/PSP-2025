@@ -12,7 +12,7 @@ func main() {
 		return
 	}
 
-	for _, arg := range os.Args[1:] { //
+	for _, arg := range os.Args[1:] { // Se pone 1: porque es [principio: final]  y os.Args es un slice de argumentos
 		edad, error := strconv.ParseInt(arg, 10, 64)
 		if error != nil { // nil es lo mismo que null
 			fmt.Println("Error: argumento no valido", arg)
