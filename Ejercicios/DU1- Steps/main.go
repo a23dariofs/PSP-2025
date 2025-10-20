@@ -18,13 +18,10 @@ func main() {
 	}
 }
 
-func saltosNecesarios(EscalonesTotales int, EscalonesXsalto int) int {
-	var division int = (EscalonesTotales % EscalonesXsalto)
-	var resultado int = (EscalonesTotales / EscalonesXsalto)
-	if division != 0 {
-		return resultado + 1
-	} else if division == 0 {
-		return resultado
+func saltosNecesarios(escalonesTotales int, escalonesXsalto int) int {
+	resultado := escalonesTotales / escalonesXsalto
+	if escalonesTotales%escalonesXsalto != 0 {
+		resultado++
 	}
-	return 0
+	return resultado
 }
