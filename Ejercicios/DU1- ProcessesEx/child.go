@@ -27,6 +27,5 @@ func main() {
 	}
 	defer file.Close()
 
-	// Escribimos directamente el string (sin fmt)
 	file.WriteString(numStr + "\n")
 }

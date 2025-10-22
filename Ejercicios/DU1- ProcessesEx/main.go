@@ -2,16 +2,17 @@ package main
 
 import (
 	"log"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 )
 
 func StartAll(cmdList []*exec.Cmd) ([]*exec.Cmd, error) {
-
+	for range 20 {
+		i, j := rand.IntN(10), rand.IntN(10)
+		cmdList[i], cmdList[j] = cmdList[j], cmdList[i]
+	}
 	for _, cmd := range cmdList {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
 		err := cmd.Start()
 		if err != nil {
 			return nil, err
