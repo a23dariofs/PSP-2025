@@ -3,27 +3,32 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 func main() {
-	//Lee que se hayan pasado todos los argumentos y si no termina el programa (son dos porque el args[0] es el nombre del programa y args[1] el argumento en string)
+
 	if len(os.Args) < 2 {
 		return
 	}
 
-	//Añadimos a una variable llamada numStr el argumento pasado en el padre y lo imprimimos
 	numStr := os.Args[1]
+	num, _ := strconv.Atoi(numStr)
 
-	fmt.Println(numStr)
+	fmt.Println(num)
 
-	//Creamos el file
-	file, err := os.OpenFile("output.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		os.Exit(1)
+	var flag int
+	if num == 0 {
+		flag = os.O_CREATE | os.O_WRONLY | os.O_TRUNC
+	} else {
+		flag = os.O_CREATE | os.O_WRONLY | os.O_APPEND
 	}
-	//Cierra el file
+
+	file, err := os.OpenFile("output.txt", flag, 0644)
+	if err != nil {
+		return
+	}
 	defer file.Close()
 
-	//Esto es para escribir en el file cada uno de los numeros con un salto de linea
-	file.WriteString(numStr + "\n")
+	file.WriteString(fmt.Sprintf("%d\n", num))
 }
