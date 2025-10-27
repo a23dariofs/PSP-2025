@@ -26,7 +26,7 @@ func main() {
 	var cmdList []*exec.Cmd
 
 	for i := 0; i < 10; i++ {
-		cmd := exec.Command("go", "run", "child.go", strconv.Itoa(i))
+		cmd := exec.Command("go", "run", "hijo/child.go", strconv.Itoa(i))
 		cmdList = append(cmdList, cmd)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
