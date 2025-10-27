@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"os/exec"
+	"strconv"
 )
 
 func StartAll(cmdList []*exec.Cmd) ([]*exec.Cmd, error) {
@@ -22,14 +23,22 @@ func StartAll(cmdList []*exec.Cmd) ([]*exec.Cmd, error) {
 }
 
 func main() {
+	var cmdList []*exec.Cmd
+
 	for i := 0; i < 10; i++ {
-		cmd := exec.Command("go", "run", "child.go", string(rune('0'+i)))
+		cmd := exec.Command("go", "run", "child.go", strconv.Itoa(i))
+		cmdList = append(cmdList, cmd)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-
-		err := cmd.Run()
-		if err != nil {
-			log.Fatal(err)
-		}
 	}
+
+	cmdList, err := StartAll(cmdList)
+	if err != nil {
+		log.Fatal("Something went wrong:", err)
+	}
+
+	for _, cmd := range cmdList {
+		cmd.Wait()
+	}
+
 }
