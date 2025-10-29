@@ -10,175 +10,138 @@ import (
 )
 
 type Producto struct {
-	ID        string
-	Nombre    string
-	Categoria string
-	Precio    float64
-	Stock     int
+	ID, Nombre, Categoria string
+	Precio                float64
+	Stock                 int
 }
 
 type Transaccion struct {
-	Tipo       string
-	IDProducto string
-	Cantidad   int
-	Fecha      string
+	Tipo, IDProducto, Fecha string
+	Cantidad                int
 }
 
 func main() {
-	inventarioArchivo := "inventario.txt"
-	transaccionesArchivo := "transacciones.txt"
+	const (
+		inventarioArchivo    = "inventario.txt"
+		transaccionesArchivo = "transacciones.txt"
+		inventarioOut        = "inventario_actualizado.txt"
+		reporteBajoStock     = "productos_bajo_stock.txt"
+		logErrores           = "errores.log"
+		limiteBajoStock      = 10
+	)
 
-	// Leer inventario
+	// Leer datos
 	productos, err := leerInventario(inventarioArchivo)
 	if err != nil {
-		fmt.Println("Error al leer inventario:", err)
+		fmt.Println("Error:", err)
 		return
 	}
 
-	// Leer transacciones
 	transacciones, err := leerTransacciones(transaccionesArchivo)
 	if err != nil {
-		fmt.Println("Error al leer transacciones:", err)
+		fmt.Println("Error:", err)
 		return
 	}
 
-	// Procesar transacciones
+	// Procesar y obtener errores
 	errores := procesarTransacciones(productos, transacciones)
 
-	// Escribir inventario actualizado
-	if err := escribirInventario(productos, "inventario_actualizado.txt"); err != nil {
-		fmt.Println("Error al escribir inventario actualizado:", err)
-	}
-
-	// Generar reporte de bajo stock (<10 unidades)
-	if err := generarReporteBajoStock(productos, 10); err != nil {
-		fmt.Println("Error al generar reporte de bajo stock:", err)
-	}
-
-	// Escribir errores en log
-	if err := escribirLog(errores, "errores.log"); err != nil {
-		fmt.Println("Error al escribir log de errores:", err)
-	}
-
+	// Guardar resultados
+	_ = escribirInventario(productos, inventarioOut)
+	_ = generarReporteBajoStock(productos, limiteBajoStock, reporteBajoStock)
+	_ = escribirLog(errores, logErrores)
 }
 
-// ---------------------- Funciones ----------------------
+// ---------------- Funciones ----------------
 
-// 1. Leer inventario
-func leerInventario(nombreArchivo string) ([]Producto, error) {
-	file, err := os.Open(nombreArchivo)
+// Leer archivo genérico (devuelve líneas sin cabecera)
+func leerArchivo(nombre string) ([]string, error) {
+	file, err := os.Open(nombre)
 	if err != nil {
-		return nil, fmt.Errorf("no se pudo abrir inventario: %w", err)
+		return nil, err
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	productos := []Producto{}
-
-	// Saltar cabecera
 	if !scanner.Scan() {
-		return nil, fmt.Errorf("archivo de inventario vacío")
+		return nil, fmt.Errorf("archivo vacío: %s", nombre)
 	}
 
-	lineaNum := 1
+	var lineas []string
 	for scanner.Scan() {
-		lineaNum++
 		linea := strings.TrimSpace(scanner.Text())
-		if linea == "" {
-			continue
+		if linea != "" {
+			lineas = append(lineas, linea)
 		}
-		campos := strings.Split(linea, ",")
+	}
+	return lineas, scanner.Err()
+}
+
+// Leer inventario
+func leerInventario(nombre string) (map[string]*Producto, error) {
+	lineas, err := leerArchivo(nombre)
+	if err != nil {
+		return nil, err
+	}
+
+	productos := make(map[string]*Producto)
+	for i, l := range lineas {
+		campos := strings.Split(l, ",")
 		if len(campos) != 5 {
-			fmt.Printf("Línea %d ignorada: formato incorrecto\n", lineaNum)
+			fmt.Printf("Línea %d inválida en inventario\n", i+2)
 			continue
 		}
-
-		precio, err := strconv.ParseFloat(campos[3], 64)
-		if err != nil {
-			fmt.Printf("Línea %d: precio inválido\n", lineaNum)
+		precio, err1 := strconv.ParseFloat(campos[3], 64)
+		stock, err2 := strconv.Atoi(campos[4])
+		if err1 != nil || err2 != nil {
+			fmt.Printf("Línea %d: error en precio o stock\n", i+2)
 			continue
 		}
-		stock, err := strconv.Atoi(campos[4])
-		if err != nil {
-			fmt.Printf("Línea %d: stock inválido\n", lineaNum)
-			continue
+		productos[campos[0]] = &Producto{
+			ID: campos[0], Nombre: campos[1], Categoria: campos[2],
+			Precio: precio, Stock: stock,
 		}
-
-		productos = append(productos, Producto{
-			ID:        campos[0],
-			Nombre:    campos[1],
-			Categoria: campos[2],
-			Precio:    precio,
-			Stock:     stock,
-		})
 	}
 	return productos, nil
 }
 
-// 2. Leer transacciones
-func leerTransacciones(nombreArchivo string) ([]Transaccion, error) {
-	file, err := os.Open(nombreArchivo)
+// Leer transacciones
+func leerTransacciones(nombre string) ([]Transaccion, error) {
+	lineas, err := leerArchivo(nombre)
 	if err != nil {
-		return nil, fmt.Errorf("no se pudo abrir transacciones: %w", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	transacciones := []Transaccion{}
-
-	// Saltar cabecera
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("archivo de transacciones vacío")
+		return nil, err
 	}
 
-	lineaNum := 1
-	for scanner.Scan() {
-		lineaNum++
-		linea := strings.TrimSpace(scanner.Text())
-		if linea == "" {
-			continue
-		}
-		campos := strings.Split(linea, ",")
+	var transacciones []Transaccion
+	for i, l := range lineas {
+		campos := strings.Split(l, ",")
 		if len(campos) != 4 {
-			fmt.Printf("⚠️ Línea %d ignorada: formato incorrecto\n", lineaNum)
+			fmt.Printf("Línea %d inválida en transacciones\n", i+2)
 			continue
 		}
-
-		cantidad, err := strconv.Atoi(campos[2])
+		cant, err := strconv.Atoi(campos[2])
 		if err != nil {
-			fmt.Printf("⚠️ Línea %d: cantidad inválida\n", lineaNum)
+			fmt.Printf("Línea %d: cantidad inválida\n", i+2)
 			continue
 		}
-
 		transacciones = append(transacciones, Transaccion{
-			Tipo:       campos[0],
-			IDProducto: campos[1],
-			Cantidad:   cantidad,
-			Fecha:      campos[3],
+			Tipo: campos[0], IDProducto: campos[1], Cantidad: cant, Fecha: campos[3],
 		})
 	}
 	return transacciones, nil
 }
 
-// 3. Procesar transacciones
-func procesarTransacciones(productos []Producto, transacciones []Transaccion) []string {
-	errores := []string{}
+// Procesar transacciones
+func procesarTransacciones(productos map[string]*Producto, trans []Transaccion) []string {
+	var errores []string
 
-	for _, t := range transacciones {
-		// Buscar producto
-		idx := -1
-		for i, p := range productos {
-			if p.ID == t.IDProducto {
-				idx = i
-				break
-			}
-		}
-		if idx == -1 {
-			errores = append(errores, fmt.Sprintf("[%s] ERROR: Producto %s no encontrado en transacción de tipo %s", t.Fecha, t.IDProducto, t.Tipo))
+	for _, t := range trans {
+		p, existe := productos[t.IDProducto]
+		if !existe {
+			errores = append(errores, fmt.Sprintf("[%s] ERROR: Producto %s no encontrado en transacción de tipo %s",
+				t.Fecha, t.IDProducto, t.Tipo))
 			continue
 		}
-
-		p := &productos[idx]
 
 		switch strings.ToUpper(t.Tipo) {
 		case "VENTA":
@@ -191,18 +154,18 @@ func procesarTransacciones(productos []Producto, transacciones []Transaccion) []
 		case "COMPRA", "DEVOLUCION":
 			p.Stock += t.Cantidad
 		default:
-			errores = append(errores, fmt.Sprintf("[%s] ERROR: Tipo de transacción desconocido: %s", t.Fecha, t.Tipo))
+			errores = append(errores, fmt.Sprintf("[%s] ERROR: Tipo de transacción desconocido: %s",
+				t.Fecha, t.Tipo))
 		}
 	}
-
 	return errores
 }
 
-// 4. Escribir inventario actualizado
-func escribirInventario(productos []Producto, nombreArchivo string) error {
-	file, err := os.Create(nombreArchivo)
+// Escribir inventario actualizado
+func escribirInventario(productos map[string]*Producto, nombre string) error {
+	file, err := os.Create(nombre)
 	if err != nil {
-		return fmt.Errorf("no se pudo crear archivo %s: %w", nombreArchivo, err)
+		return err
 	}
 	defer file.Close()
 
@@ -214,11 +177,11 @@ func escribirInventario(productos []Producto, nombreArchivo string) error {
 	return writer.Flush()
 }
 
-// 5. Generar reporte de bajo stock
-func generarReporteBajoStock(productos []Producto, limite int) error {
-	file, err := os.Create("productos_bajo_stock.txt")
+// Reporte de bajo stock (con formato solicitado)
+func generarReporteBajoStock(productos map[string]*Producto, limite int, nombre string) error {
+	file, err := os.Create(nombre)
 	if err != nil {
-		return fmt.Errorf("no se pudo crear productos_bajo_stock.txt: %w", err)
+		return err
 	}
 	defer file.Close()
 
@@ -237,21 +200,19 @@ func generarReporteBajoStock(productos []Producto, limite int) error {
 	return writer.Flush()
 }
 
-// 6. Escribir log de errores
-func escribirLog(errores []string, nombreArchivo string) error {
+// Escribir log de errores (con formato solicitado)
+func escribirLog(errores []string, nombre string) error {
 	if len(errores) == 0 {
 		return nil
 	}
-
-	file, err := os.Create(nombreArchivo)
+	file, err := os.Create(nombre)
 	if err != nil {
-		return fmt.Errorf("no se pudo crear log de errores: %w", err)
+		return err
 	}
 	defer file.Close()
 
 	writer := bufio.NewWriter(file)
 	for _, e := range errores {
-		// Añadir timestamp real al log
 		timestamp := time.Now().Format("2006-01-02 15:04:05")
 		fmt.Fprintf(writer, "[%s] %s\n", timestamp, e)
 	}
