@@ -10,53 +10,47 @@ import (
 )
 
 type Producto struct {
-	ID, Nombre, Categoria string
-	Precio                float64
-	Stock                 int
+	ID        string
+	Nombre    string
+	Categoria string
+	Precio    float64
+	Stock     int
 }
 
 type Transaccion struct {
-	Tipo, IDProducto, Fecha string
-	Cantidad                int
+	Tipo       string
+	IDProducto string
+	Cantidad   int
+	Fecha      string
 }
 
 func main() {
 	const (
-		inventarioArchivo    = "inventario.txt"
-		transaccionesArchivo = "transacciones.txt"
-		inventarioOut        = "inventario_actualizado.txt"
-		reporteBajoStock     = "productos_bajo_stock.txt"
-		logErrores           = "errores.log"
+		archivoInventario    = "inventario.txt"
+		archivoTransacciones = "transacciones.txt"
 		limiteBajoStock      = 10
 	)
 
-	// Leer datos
-	productos, err := leerInventario(inventarioArchivo)
+	inventario, err := leerInventario(archivoInventario)
 	if err != nil {
-		fmt.Println("Error:", err)
-		return
+		fmt.Println("Error: ", err)
 	}
 
-	transacciones, err := leerTransacciones(transaccionesArchivo)
+	transacciones, err := leerTransacciones(archivoTransacciones)
 	if err != nil {
-		fmt.Println("Error:", err)
-		return
+		fmt.Println("Error: ", err)
 	}
 
-	// Procesar y obtener errores
-	errores := procesarTransacciones(productos, transacciones)
+	errores := procesarTransacciones(inventario, transacciones)
 
-	// Guardar resultados
-	_ = escribirInventario(productos, inventarioOut)
-	_ = generarReporteBajoStock(productos, limiteBajoStock, reporteBajoStock)
-	_ = escribirLog(errores, logErrores)
+	escribirInventario(inventario, "inventario_actualizado.txt")
+	generarReporteBajoStock(inventario, limiteBajoStock, "productos_bajo_stock.txt")
+	escribirLog(errores, "errores.log")
+
 }
 
-// ---------------- Funciones ----------------
-
-// Leer archivo genérico (devuelve líneas sin cabecera)
 func leerArchivo(nombre string) ([]string, error) {
-	file, err := os.Open(nombre)
+	file, err := os.OpenFile(nombre, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -77,15 +71,14 @@ func leerArchivo(nombre string) ([]string, error) {
 	return lineas, scanner.Err()
 }
 
-// Leer inventario
-func leerInventario(nombre string) (map[string]*Producto, error) {
-	lineas, err := leerArchivo(nombre)
+func leerInventario(name string) (map[string]*Producto, error) {
+	file, err := leerArchivo(name)
 	if err != nil {
 		return nil, err
 	}
 
 	productos := make(map[string]*Producto)
-	for i, l := range lineas {
+	for i, l := range file {
 		campos := strings.Split(l, ",")
 		if len(campos) != 5 {
 			fmt.Printf("Línea %d inválida en inventario\n", i+2)
@@ -93,6 +86,7 @@ func leerInventario(nombre string) (map[string]*Producto, error) {
 		}
 		precio, err1 := strconv.ParseFloat(campos[3], 64)
 		stock, err2 := strconv.Atoi(campos[4])
+
 		if err1 != nil || err2 != nil {
 			fmt.Printf("Línea %d: error en precio o stock\n", i+2)
 			continue
@@ -105,33 +99,33 @@ func leerInventario(nombre string) (map[string]*Producto, error) {
 	return productos, nil
 }
 
-// Leer transacciones
-func leerTransacciones(nombre string) ([]Transaccion, error) {
-	lineas, err := leerArchivo(nombre)
+func leerTransacciones(name string) ([]Transaccion, error) {
+	file, err := leerArchivo(name)
 	if err != nil {
 		return nil, err
 	}
 
 	var transacciones []Transaccion
-	for i, l := range lineas {
+
+	for i, l := range file {
 		campos := strings.Split(l, ",")
 		if len(campos) != 4 {
-			fmt.Printf("Línea %d inválida en transacciones\n", i+2)
+			fmt.Printf("Línea %d inválida en inventario\n", i+2)
 			continue
 		}
-		cant, err := strconv.Atoi(campos[2])
+		cantidad, err := strconv.Atoi(campos[2])
 		if err != nil {
-			fmt.Printf("Línea %d: cantidad inválida\n", i+2)
+			fmt.Printf("Línea %d: error en cantidad\n", i+2)
 			continue
 		}
 		transacciones = append(transacciones, Transaccion{
-			Tipo: campos[0], IDProducto: campos[1], Cantidad: cant, Fecha: campos[3],
+			Tipo: campos[0], IDProducto: campos[1], Cantidad: cantidad, Fecha: campos[3],
 		})
 	}
+
 	return transacciones, nil
 }
 
-// Procesar transacciones
 func procesarTransacciones(productos map[string]*Producto, trans []Transaccion) []string {
 	var errores []string
 
@@ -151,8 +145,10 @@ func procesarTransacciones(productos map[string]*Producto, trans []Transaccion) 
 				continue
 			}
 			p.Stock -= t.Cantidad
+
 		case "COMPRA", "DEVOLUCION":
 			p.Stock += t.Cantidad
+
 		default:
 			errores = append(errores, fmt.Sprintf("[%s] ERROR: Tipo de transacción desconocido: %s",
 				t.Fecha, t.Tipo))
@@ -161,7 +157,6 @@ func procesarTransacciones(productos map[string]*Producto, trans []Transaccion) 
 	return errores
 }
 
-// Escribir inventario actualizado
 func escribirInventario(productos map[string]*Producto, nombre string) error {
 	file, err := os.Create(nombre)
 	if err != nil {
@@ -173,11 +168,11 @@ func escribirInventario(productos map[string]*Producto, nombre string) error {
 	fmt.Fprintln(writer, "ID,Nombre,Categoria,Precio,Stock")
 	for _, p := range productos {
 		fmt.Fprintf(writer, "%s,%s,%s,%.2f,%d\n", p.ID, p.Nombre, p.Categoria, p.Precio, p.Stock)
+
 	}
 	return writer.Flush()
 }
 
-// Reporte de bajo stock
 func generarReporteBajoStock(productos map[string]*Producto, limite int, nombre string) error {
 	file, err := os.Create(nombre)
 	if err != nil {
@@ -200,11 +195,7 @@ func generarReporteBajoStock(productos map[string]*Producto, limite int, nombre 
 	return writer.Flush()
 }
 
-// Escribir log de errores
 func escribirLog(errores []string, nombre string) error {
-	if len(errores) == 0 {
-		return nil
-	}
 	file, err := os.Create(nombre)
 	if err != nil {
 		return err
@@ -212,6 +203,7 @@ func escribirLog(errores []string, nombre string) error {
 	defer file.Close()
 
 	writer := bufio.NewWriter(file)
+
 	for _, e := range errores {
 		timestamp := time.Now().Format("2006-01-02 15:04:05")
 		fmt.Fprintf(writer, "[%s] %s\n", timestamp, e)
