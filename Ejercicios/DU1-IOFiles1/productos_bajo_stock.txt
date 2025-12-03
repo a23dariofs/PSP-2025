@@ -1,3 +1,0 @@
-ALERTA: PRODUCTOS CON BAJO STOCK
-================================
-Total de productos con bajo stock: 0
