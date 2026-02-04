@@ -42,7 +42,6 @@ func main() {
 
 	startTime := time.Now()
 
-	// Lista de URLs (simuladas)
 	urlList := []string{
 		"https://example.com/page1",
 		"https://example.com/page2",
